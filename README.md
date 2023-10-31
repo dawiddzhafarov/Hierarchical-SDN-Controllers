@@ -20,7 +20,7 @@ For simple test run - on Mininet VM please run:
 
 > in one terminal
 ```
-ryu-manager ryu.app.simple_switch_13 --log-file /tmp/ryu-logs.$$.log &>/dev/null
+ryu-manager ryu.app.simple_switch_stp_13 --log-file /tmp/ryu-logs.$$.log &>/dev/null
 tail -f /tmp/ryu-logs.$$.log
 ```
 

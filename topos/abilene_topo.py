@@ -28,17 +28,17 @@ class AbileneTopo(Topo):
         h11 = self.addHost('h-nyc')
 
         # add switches
-        s1  = self.addSwitch('sw-sea')
-        s2  = self.addSwitch('sw-sjc')
-        s3  = self.addSwitch('sw-den')
-        s4  = self.addSwitch('sw-lax')
-        s5  = self.addSwitch('sw-mci')
-        s6  = self.addSwitch('sw-hou')
-        s7  = self.addSwitch('sw-ind')
-        s8  = self.addSwitch('sw-atl')
-        s9  = self.addSwitch('sw-ord')
-        s10 = self.addSwitch('sw-iad')
-        s11 = self.addSwitch('sw-nyc')
+        s1  = self.addSwitch('sw-sea', dpid="00:00:00:00:00:00:00:01")
+        s2  = self.addSwitch('sw-sjc', dpid="00:00:00:00:00:00:00:02")
+        s3  = self.addSwitch('sw-den', dpid="00:00:00:00:00:00:00:03")
+        s4  = self.addSwitch('sw-lax', dpid="00:00:00:00:00:00:00:04")
+        s5  = self.addSwitch('sw-mci', dpid="00:00:00:00:00:00:00:05")
+        s6  = self.addSwitch('sw-hou', dpid="00:00:00:00:00:00:00:06")
+        s7  = self.addSwitch('sw-ind', dpid="00:00:00:00:00:00:00:07")
+        s8  = self.addSwitch('sw-atl', dpid="00:00:00:00:00:00:00:08")
+        s9  = self.addSwitch('sw-ord', dpid="00:00:00:00:00:00:00:09")
+        s10 = self.addSwitch('sw-iad', dpid="00:00:00:00:00:00:00:10")
+        s11 = self.addSwitch('sw-nyc', dpid="00:00:00:00:00:00:00:11")
 
         # basic setup hosts behind switches
         self.addLink(h1,  s1,  addr1="10:00:00:00:01:01", addr2="00:00:00:00:01:ff")

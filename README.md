@@ -14,6 +14,10 @@
 
  * consists of 11 switches
 
+## Traffic generators
+- [ixia-c](https://github.com/open-traffic-generator/ixia-c#quick-start)
+- [D-ITG](https://traffic.comics.unina.it/software/ITG/download.php)
+
 ## Running basic scenario
 
 For simple test run - on Mininet VM please run:

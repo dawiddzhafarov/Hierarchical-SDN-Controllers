@@ -1,0 +1,33 @@
+#!/bin/bash
+# vim: ts=4 : sts=4 : sw=4 : et :
+#
+# you need: fzf
+
+if [ $(id -u) -ne 0 ]; then
+    echo "Must run as sudo."
+    exit 1
+fi
+
+_chosen_host="${1:-}"
+
+_host_list="$(pgrep -fa mininet | awk '{print $1,$NF}')"
+if [ -z "${_host_list}" ]; then
+    echo "No hosts to attach to."
+    exit 2
+fi
+
+_choice_list="$(grep "${_chosen_host}" <<<"${_host_list}")"
+if [ -n "${_choice_list}" ] && [ "$(wc -l <<<"${_choice_list}")" -eq 1 ]; then
+    _choice="$(grep "${_chosen_host}" <<<"${_host_list}" | cut -d: -f2)"
+elif [ "$(wc -l <<<"${_choice_list}")" -gt 1 ]; then
+    _choice="$(echo "${_choice_list}" | cut -d' ' -f2 | cut -d: -f2 \
+        | fzf --height=10% --border=sharp --border-label=" Choose Mininet host ")"
+else
+    _choice="$(echo "${_host_list}" | cut -d' ' -f2 | cut -d: -f2 \
+        | fzf --height=10% --border=sharp --border-label=" Choose Mininet host ")"
+fi
+
+[ -z "$(grep MNNODE /root/.bashrc)" ] \
+     && echo "[ -n "\$MNNODE" ] && export PS1=\"[\$MNNODE]: \\w\\\\\$ \"" >> /root/.bashrc
+
+mnexec -a "$(grep "${_choice}" <<<"${_host_list}" | cut -d' ' -f1)" env MNNODE="${_choice}" bash -i

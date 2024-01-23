@@ -12,6 +12,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import psutil
 import socket
 import struct
@@ -30,6 +31,7 @@ from ryu.lib import hub
 from ryu.topology import api
 from ryu.topology import event
 from aux_classes import LBEventRoleChange
+from super_controller import ROLE, CMD
 
 LOG = logging.getLogger("load_balance_lib")
 # struct consists of a single unsigned byte (8 bits).
@@ -65,7 +67,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
-        self.server_addr = kwargs.get("server_addr", "127.0.0.1")
+        self.server_addr = kwargs.get("server_addr", "0.0.0.0")
         self.server_port = kwargs.get("server_port", 10807)
         self.global_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mac_to_port = {}
@@ -85,6 +87,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             dp.send_msg(msg)
             LOG.debug(f'sent init role request: {role} for switch: {dp}')
 
+        self.start_serve()
 
     set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
@@ -237,10 +240,10 @@ class SimpleSwitch13(app_manager.RyuApp):
            which informs that next struct contains DPID
         2) send DPID (DPStruct) with DPID value
         """
-        header_data = HeaderStruct.pack(1)
-        self.global_socket.sendall(header_data)
-
-        dp_data = DPStruct.pack(dpid)
+        dp_data = json.dumps({
+            'cmd': f"{CMD.DPID_REQUEST}",
+            'dpid': dpid
+        })
         self.global_socket.sendall(dp_data)
 
     def _balance_loop(self):
@@ -252,28 +255,24 @@ class SimpleSwitch13(app_manager.RyuApp):
             cpu_util = get_cpu_utilization()
             mem_util = get_ram_utilization()
 
-            # send header, 0 for load
-            header_data = HeaderStruct.pack(0)
-            self.global_socket.sendall(header_data)
-
-            load_data = UtilStruct.pack(cpu_util << 8 | mem_util)
+            load_data = json.dumps({
+                'cmd': f"{CMD.LOAD_UPDATE}",
+                'load': cpu_util if self.OFPIN_IN_COUNTER == 0 else self.OFPIN_IN_COUNTER
+            })
             self.global_socket.sendall(load_data)
-            role_data = self.global_socket.recv(RoleStruct.size)
-            dpid, role = RoleStruct.unpack(role_data)
-
-            # Role:
-            # [dpid][role]
-            # 0: no change
-            # 1: master
-            # 2: slave
-
-            if role == 0:
-                LOG.debug("no need to change role.")
-                continue
-
-            else:
-                role_event = LBEventRoleChange(dpid, role)
-                LOG.debug(f"role event change -> {role}")
-                # below sends event to _role_change_handler observer
-                self.send_event_to_observers(role_event)
+            _buffer = self.global_socket.recv(128)
+            msg_lines = _buffer.decode('utf-8').splitlines()
+            for _line in msg_lines:
+                msg = json.loads(_line)
+                if msg['cmd'] == CMD.ROLE_CHANGE:
+                    role = msg['role']
+                    dpid = msg['dpid']
+                    if role == 0:
+                        LOG.debug("no need to change role.")
+                        continue
+                    else:
+                        role_event = LBEventRoleChange(dpid, role)
+                        LOG.debug(f"role event change -> {role}")
+                        # below sends event to _role_change_handler observer
+                        self.send_event_to_observers(role_event)
             sleep(seconds=3)

@@ -52,3 +52,6 @@ You can find it `./scripts/`
 sudo wireshark '-oextcap.sshdump.remotehost:172.233.49.146' '-oextcap.sshdump.remoteuser:mnadmin' -i sshdump -k
 ```
 
+### generating traffic
+
+Use `ITGSend` and `ITGRecv` with appropriate parameters in order to generate traffic between hosts. Captured logs can be decoded using `ITGDec`. Please refer to the official documentation: https://traffic.comics.unina.it/software/ITG/manual/. The application is located in the home directory, in the `D-ITG-2.8.1-r1023` directory. To execute the commands on the hosts, make sure to be inside `D-ITG-2.8.1-r1023/bin` directory.

@@ -199,8 +199,8 @@ class SCWorker:
                     self._overseerController.handleDpidResponse(dpid, self.workerID)
 
                 case CMD.LOAD_UPDATE:
-                    # TODO: create LOAD_UPDATE command handler
-                    pass
+                    load = msg['load']
+                    self._overseerController.handleLoadUpdate(load, self.workerID)
 
                 case _:
                     logger.error(f"No such {msg= }.")
@@ -370,9 +370,20 @@ class SuperController:
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
             if role == ROLE.MASTER.value and dpid in self.workers[free_worker_id].dpid2role.keys():
-                # TODO: balancing is not finished
-                pass
-
+                msg = json.dumps({
+                    'cmd': f"{CMD.ROLE_CHANGE}",
+                    'role': 2,
+                    'dpid': dpid,
+                })
+                self.workers[busy_worker_id].sendMsg(msg)
+                msg = json.dumps({
+                    'cmd': f"{CMD.ROLE_CHANGE}",
+                    'role': 1,
+                    'dpid': dpid,
+                })
+                self.workers[free_worker_id].sendMsg(msg)
+                # TODO: balancing is not finished?
+                return None
 
     def _sendingLoop(self):
         while True:
@@ -530,6 +541,9 @@ class SuperController:
             if _link['dst']['dpid'] == dpid:
                 _link['dst']['worker_id'] = worker_id
     # . BEGIN SuperController utils {
+
+    def handleLoadBalance(self, load: int, worker_id: int) -> None:
+        self.workers[worker_id].loadScore = load
 
 
 def sc_run() -> int:

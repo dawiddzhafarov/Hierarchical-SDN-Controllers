@@ -32,7 +32,6 @@ from ryu.topology import event
 from aux_classes import LBEventRoleChange
 
 LOG = logging.getLogger("load_balance_lib")
-
 # struct consists of a single unsigned byte (8 bits).
 HeaderStruct = struct.Struct("!B")
 # the struct consists of an unsigned integer (32 bits).
@@ -84,6 +83,8 @@ class SimpleSwitch13(app_manager.RyuApp):
             gen_id = random.randint(0, 10000)
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
             dp.send_msg(msg)
+            LOG.debug(f'sent init role request: {role} for switch: {dp}')
+
 
     set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
@@ -117,6 +118,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             gen_id = random.randint(0, 10000)
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
             dp.send_msg(msg)
+            LOG.debug(f'sent role change request: {role} for switch: {dp}')
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):

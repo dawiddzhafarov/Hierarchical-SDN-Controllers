@@ -27,7 +27,8 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-from ryu.lib import hub
+from ryu.lib import hub, stplib
+from ryu.lib import dpid as dpid_lib
 from ryu.topology import api
 from ryu.topology import event
 from aux_classes import LBEventRoleChange
@@ -64,14 +65,27 @@ class SimpleSwitch13(app_manager.RyuApp):
     """
 
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    _CONTEXTS = {'stplib': stplib.Stp}
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
-        self.server_addr = kwargs.get("server_addr", "0.0.0.0")
+        self.server_addr = kwargs.get("server_addr", "127.0.0.1")
         self.server_port = kwargs.get("server_port", 10807)
         self.global_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mac_to_port = {}
         self.OFPIN_IN_COUNTER: int = 0
+
+        self.stp = kwargs['stplib']
+
+        # Sample of stplib config.
+        #  please refer to stplib.Stp.set_config() for details.
+        config = {dpid_lib.str_to_dpid('0000000000000001'):
+                  {'bridge': {'priority': 0x8000}},
+                  dpid_lib.str_to_dpid('0000000000000002'):
+                  {'bridge': {'priority': 0x9000}},
+                  dpid_lib.str_to_dpid('0000000000000003'):
+                  {'bridge': {'priority': 0xa000}}}
+        self.stp.set_config(config)
 
         switches = api.get_all_switch(self)
 
@@ -88,6 +102,18 @@ class SimpleSwitch13(app_manager.RyuApp):
             LOG.debug(f'sent init role request: {role} for switch: {dp}')
 
         self.start_serve()
+
+    def delete_flow(self, datapath):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        for dst in self.mac_to_port[datapath.id].keys():
+            match = parser.OFPMatch(eth_dst=dst)
+            mod = parser.OFPFlowMod(
+                datapath, command=ofproto.OFPFC_DELETE,
+                out_port=ofproto.OFPP_ANY, out_group=ofproto.OFPG_ANY,
+                priority=1, match=match)
+            datapath.send_msg(mod)
 
     set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
@@ -275,4 +301,25 @@ class SimpleSwitch13(app_manager.RyuApp):
                         LOG.debug(f"role event change -> {role}")
                         # below sends event to _role_change_handler observer
                         self.send_event_to_observers(role_event)
-            sleep(seconds=3)
+            sleep(seconds=1)
+
+    @set_ev_cls(stplib.EventTopologyChange, MAIN_DISPATCHER)
+    def _topology_change_handler(self, ev):
+        dp = ev.dp
+        dpid_str = dpid_lib.dpid_to_str(dp.id)
+        msg = 'Receive topology change event. Flush MAC table.'
+        self.logger.debug("[dpid=%s] %s", dpid_str, msg)
+
+        if dp.id in self.mac_to_port:
+            self.delete_flow(dp)
+            del self.mac_to_port[dp.id]
+    @set_ev_cls(stplib.EventPortStateChange, MAIN_DISPATCHER)
+    def _port_state_change_handler(self, ev):
+        dpid_str = dpid_lib.dpid_to_str(ev.dp.id)
+        of_state = {stplib.PORT_STATE_DISABLE: 'DISABLE',
+                    stplib.PORT_STATE_BLOCK: 'BLOCK',
+                    stplib.PORT_STATE_LISTEN: 'LISTEN',
+                    stplib.PORT_STATE_LEARN: 'LEARN',
+                    stplib.PORT_STATE_FORWARD: 'FORWARD'}
+        self.logger.debug("[dpid=%s][port=%d] state=%s",
+                          dpid_str, ev.port_no, of_state[ev.port_state])

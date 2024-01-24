@@ -16,8 +16,8 @@ from socket import socket
 import networkx as nx
 from eventlet import Timeout, listen, spawn
 from eventlet.queue import Empty, Queue
-from eventlet.greenthread import GreenletExit, GreenThread, sleep
-
+from eventlet.greenthread import GreenThread, sleep
+from greenlet import GreenletExit
 
 logger = getLogger("SDN_SuperController")
 basicConfig(stream=stdout, level=DEBUG)

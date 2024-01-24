@@ -27,7 +27,9 @@ BETA = 1 - ALPHA
 
 class LoadController(simple_switch_13.SimpleSwitch13):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    _CONTEXTS = {'stplib': stplib.Stp}
+    _CONTEXTS = {'stplib': stplib.Stp,
+                 'dpset': dpset.DPSet,
+                 }
 
     def __init__(self, *args, **kwargs):
         super(LoadController, self).__init__(*args, **kwargs)
@@ -39,6 +41,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.sendQueue: Queue | None = Queue(32)
         self.controller_role: list[dict[str, str]] = []
         self.stp = kwargs['stplib']
+        self.dpset = kwargs['dpset']
         self.name = kwargs.get('name', 'default')
         logging.basicConfig(stream=stdout, level=logging.info)
 

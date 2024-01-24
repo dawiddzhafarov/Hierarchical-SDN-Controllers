@@ -218,6 +218,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         and receive global controller decision
         """
         while True:
+            self.send_msg_to_controller('dupa')
             _buffer = self.global_socket.recv(128)
             msg_lines = _buffer.decode('utf-8').splitlines()
             for _line in msg_lines:

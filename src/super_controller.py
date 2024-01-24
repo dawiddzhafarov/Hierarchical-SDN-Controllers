@@ -125,10 +125,6 @@ class SCServer:
             IPv6Address(listen_info[0])
             self.server = listen(listen_info, family=AF_INET6)
         except AddressValueError:
-            # if Path(listen_info[0]).parent.is_dir():
-            #     self.server = listen(listen_info[0], family=AF_UNIX)
-            # else:
-            #     self.server = listen(listen_info)
             self.server = listen(listen_info)
 
         self.handle = handle
@@ -206,9 +202,8 @@ class SCWorker:
                     return
 
                 case CMD.XDOM_LINK_ADD:
-                    logger.debug('Got cross-domain link message')
                     src, dst = msg['src'], msg['dst']
-                    logger.debug(f"{src= }, {dst= }")
+                    logger.debug(f"Got cross-domain link message: {src= }, {dst= }")
                     self._overseerController.handleXDomLinkAdd(src, dst, self.workerID)
 
                 case CMD.HOST_RESPONSE:
@@ -260,7 +255,7 @@ class SCWorker:
                 pass
 
 
-    def _receivingLoop(self):
+    def _receivingLoop(self) -> None:
         """Receiving loop for a client."""
         with Timeout(10, False):
             while self.isActive:
@@ -282,32 +277,35 @@ class SCWorker:
 
         logger.info(f"Connection with {self.clientAddress} timed out.")
         self.isActive = False
-        return
 
 
-    def serve(self):
+    def serve(self) -> None:
         """Spawn sending and receiving threads for a client."""
         thread1 = SCWSEventBase.spawnThread(self._sendingLoop)
         thread2 = SCWSEventBase.spawnThread(self._receivingLoop)
         SCWSEventBase.joinAll([thread1, thread2])
 
 
-    def numControlledSwitches(self):
-        """Number of switches that have this controlled as master."""
+    def numControlledSwitches(self) -> int:
+        """Calculate the number of switches that have this controlled as master.
+
+        Returns:
+            number of switches it is a master for
+        """
         result = 0
         for k in self.dpid2role:
             result += 1 if self.dpid2role[k] == ROLE.MASTER else 0
         return result
 
-    def close(self):
+    def close(self) -> None:
         """Deactivate and close the worker thread."""
         self.isActive = False
         self.webSocket.close()
 
 
 class SuperController:
-    """SuperController class to manage links between domains and manage switch handover from domain
-    to another.
+    """SuperController class to manage links between domains
+    and manage switch handover from domain to another.
 
     Attributes:
         workers: map of workerIDs to workerThreads
@@ -326,7 +324,7 @@ class SuperController:
 
 
     # . BEGIN SuperController utils {
-    def _connectionFactory(self, sock: socket, addr: tuple[str, int]):
+    def _connectionFactory(self, sock: socket, addr: tuple[str, int]) -> None:
         """Connection handler for SuperController Server.
 
         Args:
@@ -367,11 +365,11 @@ class SuperController:
 
 
     def _findFreeControllers(self, busy_controller_id: int) -> int | None:
-        """Find free or low loaded controller
+        """Find free or low loaded controller.
 
             Free controller find dynamics:
-                * less load score
-                * less switch control
+                * lower load score
+                * less switches under control (role == MASTER)
 
         Args:
             busy_controller_id: id of a controller/worker that you want to find less
@@ -489,9 +487,9 @@ class SuperController:
     # . END SuperController utils }
 
 
-    # . BEGIN SuperController utils {
+    # BEGIN SuperController handlers {
     def handleXDomLinkAdd(self, src: dict, dst: dict, worker_id: int) -> None:
-        """Add link between domains
+        """Add link between domains.
 
         Args:
             src: source info

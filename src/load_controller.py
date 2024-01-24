@@ -148,14 +148,15 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             'cmd': f"{CMD.DPID_TO_ROLE}",
             'switches': self.controller_role
         })
-        self.send_msg_to_controller(dpid2role_data.encode())
+        self.send_msg_to_controller(dpid2role_data)
 
     def start_serve(self):
         try:
             self.global_socket.connect((self.server_addr, self.server_port))
             thread1 = hub.spawn(self._sendingLoop)
             thread2 = hub.spawn(self._balance_loop)
-            hub.joinall([thread1, thread2])
+            thread3 = hub.spawn(self._sendLoad)
+            hub.joinall([thread1, thread2, thread3])
         except Exception as e:
             self.logger.info(f'exception in loop: {e=}')
             raise e

@@ -80,10 +80,10 @@ class LoadController(simple_switch_13.SimpleSwitch13):
     def _event_switch_enter_handler(self, ev):
         dpid = ev.switch.dp.id
         self.logger.info(f'EventSwitchEnter: {dpid=}')
-        self._get_self_role(ev.switch.dp)
+        self._get_self_role(ev.switch.dp, None)
         self._request_controller_role(ev.switch.dp)
         self._send_roles_to_master()
-        self._get_self_role(ev.switch.dp)
+        self._get_self_role(ev.switch.dp, None)
         #self.add_dpid(dpid)
 
     @set_ev_cls(LBEventRoleChange, MAIN_DISPATCHER)
@@ -125,8 +125,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.logger.info(f'sent role query for switch: {datapath} with body: {req}')
         datapath.send_msg(req)
 
-    def _get_self_role(self, datapath):
-        out = ofctl.get_role(datapath, waiters=datapath.id)
+    def _get_self_role(self, datapath, waiters: list):
+        out = ofctl.get_role(datapath, waiters=None)
         self.logger.info(f'magia: {out}')
 
     @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)

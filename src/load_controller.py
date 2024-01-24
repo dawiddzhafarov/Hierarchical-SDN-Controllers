@@ -61,8 +61,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             gen_id = random.randint(0, 10000)
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
             dp.send_msg(msg)
-            self.logger.info(f'sent init role request: {role} for switch: {dp}')
-            self.controller_role.append({"dpid": dp, "role": role})
+            self.logger.info(f'sent init role request: {role} for switch: {dp.id}')
+            self.controller_role.append({"dpid": dp.id, "role": role})
         self.start_serve()
         self._send_roles_to_master()
 
@@ -136,7 +136,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                 self.logger.error('role unknown')
 
         _new_roles = [role_dict for role_dict in self.controller_role if role_dict['dpid'] != dp]
-        _new_roles.append({'dpid': f'{dp}', 'role': role})
+        _new_roles.append({'dpid': f'{dp.id}', 'role': role})
         self.controller_role = _new_roles
         self.logger.info("Controller Role Reply received:")
         self.logger.info("Datapath ID: %s", dp)

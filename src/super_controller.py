@@ -43,6 +43,7 @@ class CMD(StrEnum):
     DPID_RESPONSE = auto()
     LOAD_UPDATE = auto()
     ROLE_CHANGE = auto()
+    DPID_TO_ROLE = auto()
 
     def __repr__(self):
         return f"{self.name.lower()}"

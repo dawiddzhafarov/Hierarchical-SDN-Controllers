@@ -12,11 +12,14 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import psutil
 import socket
 import struct
 import logging
 import random
+
+from requests import Response
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
@@ -26,22 +29,18 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-from ryu.lib import hub
+from ryu.lib import hub, stplib
+from ryu.lib import dpid as dpid_lib
 from ryu.topology import api
 from ryu.topology import event
+from ryu.app.ofctl_rest import RestStatsApi
 from aux_classes import LBEventRoleChange
+from super_controller import ROLE, CMD
 
 LOG = logging.getLogger("load_balance_lib")
-# struct consists of a single unsigned byte (8 bits).
-HeaderStruct = struct.Struct("!B")
-# the struct consists of an unsigned integer (32 bits).
-DPStruct = struct.Struct("!I")
-# struct consists of two unsigned bytes (16 bits each), effectively forming a 16-bit unsigned integer.
-# third byte represents OFPacketIn counter
-UtilStruct = struct.Struct("!BBB")
-# struct combines an unsigned integer (32 bits) followed by an unsigned byte (8 bits) in its binary representation.
-RoleStruct = struct.Struct("!IB")
 
+ALPHA = 0.5
+BETA = 1 - ALPHA
 
 def get_cpu_utilization(interval: int = 1) -> int:
     return int(psutil.cpu_percent(interval=interval))
@@ -62,6 +61,7 @@ class SimpleSwitch13(app_manager.RyuApp):
     """
 
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    _CONTEXTS = {'stplib': stplib.Stp, 'rest': RestStatsApi}
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
@@ -70,21 +70,46 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.global_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.mac_to_port = {}
         self.OFPIN_IN_COUNTER: int = 0
+        self.controller_role: list[dict[str, str]] = []
+        self.stp = kwargs['stplib']
+        self.rest = kwargs['rest']
 
-        switches = api.get_all_switch(self)
+        config = {dpid_lib.str_to_dpid('0000000000000001'):
+                  {'bridge': {'priority': 0x8000}},
+                  dpid_lib.str_to_dpid('0000000000000002'):
+                  {'bridge': {'priority': 0x9000}},
+                  dpid_lib.str_to_dpid('0000000000000003'):
+                  {'bridge': {'priority': 0xa000}}}
+        self.stp.set_config(config)
 
+        # TODO: uncomment when checked that one controller is elected master upon first OPFIn arrival
         # change to slave first
-        for switch in switches:
-            dp = switch.dp
-            ofp = dp.ofproto
-            ofp_parser = dp.ofproto_parser
-            role = ofp.OFPCR_ROLE_SLAVE
-            # generate new generation id
-            gen_id = random.randint(0, 10000)
-            msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
-            dp.send_msg(msg)
-            LOG.debug(f'sent init role request: {role} for switch: {dp}')
+        # switches = api.get_all_switch(self)
+        # for switch in switches:
+        #     dp = switch.dp
+        #     ofp = dp.ofproto
+        #     ofp_parser = dp.ofproto_parser
+        #     role = ofp.OFPCR_ROLE_SLAVE
+        #     # generate new generation id
+        #     gen_id = random.randint(0, 10000)
+        #     msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
+        #     dp.send_msg(msg)
+        #     LOG.debug(f'sent init role request: {role} for switch: {dp}')
+        #     self.controller_role.append({"dpid": dp, "role": role})
 
+        self.start_serve()
+
+    def delete_flow(self, datapath):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        for dst in self.mac_to_port[datapath.id].keys():
+            match = parser.OFPMatch(eth_dst=dst)
+            mod = parser.OFPFlowMod(
+                datapath, command=ofproto.OFPFC_DELETE,
+                out_port=ofproto.OFPP_ANY, out_group=ofproto.OFPG_ANY,
+                priority=1, match=match)
+            datapath.send_msg(mod)
 
     set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
@@ -237,10 +262,10 @@ class SimpleSwitch13(app_manager.RyuApp):
            which informs that next struct contains DPID
         2) send DPID (DPStruct) with DPID value
         """
-        header_data = HeaderStruct.pack(1)
-        self.global_socket.sendall(header_data)
-
-        dp_data = DPStruct.pack(dpid)
+        dp_data = json.dumps({
+            'cmd': f"{CMD.DPID_REQUEST}",
+            'dpid': dpid
+        })
         self.global_socket.sendall(dp_data)
 
     def _balance_loop(self):
@@ -251,29 +276,100 @@ class SimpleSwitch13(app_manager.RyuApp):
         while True:
             cpu_util = get_cpu_utilization()
             mem_util = get_ram_utilization()
-
-            # send header, 0 for load
-            header_data = HeaderStruct.pack(0)
-            self.global_socket.sendall(header_data)
-
-            load_data = UtilStruct.pack(cpu_util << 8 | mem_util)
+            self.load_score = ALPHA * cpu_util + BETA * mem_util
+            load_data = json.dumps({
+                'cmd': f"{CMD.LOAD_UPDATE}",
+                'load': self.load_score
+            })
             self.global_socket.sendall(load_data)
-            role_data = self.global_socket.recv(RoleStruct.size)
-            dpid, role = RoleStruct.unpack(role_data)
+            _buffer = self.global_socket.recv(128)
+            msg_lines = _buffer.decode('utf-8').splitlines()
+            for _line in msg_lines:
+                msg = json.loads(_line)
+                if msg['cmd'] == CMD.ROLE_CHANGE:
+                    role = msg['role']
+                    dpid = msg['dpid']
+                    if role == 0:
+                        LOG.debug("no need to change role.")
+                        continue
+                    else:
+                        role_event = LBEventRoleChange(dpid, role)
+                        LOG.debug(f"role event change -> {role}")
+                        # below sends event to _role_change_handler observer
+                        self.send_event_to_observers(role_event)
+            sleep(seconds=1)
 
-            # Role:
-            # [dpid][role]
-            # 0: no change
-            # 1: master
-            # 2: slave
+    @set_ev_cls(stplib.EventTopologyChange, MAIN_DISPATCHER)
+    def _topology_change_handler(self, ev):
+        dp = ev.dp
+        dpid_str = dpid_lib.dpid_to_str(dp.id)
+        msg = 'Receive topology change event. Flush MAC table.'
+        self.logger.debug("[dpid=%s] %s", dpid_str, msg)
 
-            if role == 0:
-                LOG.debug("no need to change role.")
-                continue
+        dp_data = json.dumps({
+            'cmd': f"{CMD.DPID_REQUEST}",
+            'dpid': dp
+        })
+        self.global_socket.sendall(dp_data)
 
-            else:
-                role_event = LBEventRoleChange(dpid, role)
-                LOG.debug(f"role event change -> {role}")
-                # below sends event to _role_change_handler observer
-                self.send_event_to_observers(role_event)
-            sleep(seconds=3)
+        # request role for all connected switches
+        # ad1: if a switch goes down its state is not updated, thus super_controller is updated with
+        #      inaccurate info
+        self._request_self_role_for_switches()
+
+        if dp.id in self.mac_to_port:
+            self.delete_flow(dp)
+            del self.mac_to_port[dp.id]
+
+        dpid2role_data = json.dumps({
+            'cmd': f"{CMD.DPID_TO_ROLE}",
+            'switches': self.controller_role
+        })
+        self.global_socket.sendall(dpid2role_data)
+
+    @set_ev_cls(stplib.EventPortStateChange, MAIN_DISPATCHER)
+    def _port_state_change_handler(self, ev):
+        dpid_str = dpid_lib.dpid_to_str(ev.dp.id)
+        of_state = {stplib.PORT_STATE_DISABLE: 'DISABLE',
+                    stplib.PORT_STATE_BLOCK: 'BLOCK',
+                    stplib.PORT_STATE_LISTEN: 'LISTEN',
+                    stplib.PORT_STATE_LEARN: 'LEARN',
+                    stplib.PORT_STATE_FORWARD: 'FORWARD'}
+        self.logger.debug("[dpid=%s][port=%d] state=%s",
+                          dpid_str, ev.port_no, of_state[ev.port_state])
+
+    def _request_self_role_for_switches(self) -> None:
+        """
+        Request all connected switches for self-role
+        """
+        switches = api.get_all_switch(self)
+        for switch in switches:
+            dp = switch.dp
+            self._request_controller_role(dp)
+            LOG.debug(f'sent role query for switch: {dp}')
+
+    @staticmethod
+    def _request_controller_role(datapath):
+        """
+        Request controller role for a given DPID
+        """
+        ofp_parser = datapath.ofproto_parser
+        req = ofp_parser.OFPCtrlMsg(
+            datapath, datapath.ofproto.OFPT_ROLE_REQUEST,
+            datapath.ofproto.OFPCR_ROLE_REQUEST_MORE)
+        datapath.send_msg(req)
+        LOG.debug(f'sent role query for switch: {datapath} with body: {req}')
+
+    @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)
+    def _role_reply_handler(self, ev):
+        msg = ev.msg
+        dp = msg.dp
+        role = msg.role
+
+        _new_roles = [role_dict for role_dict in self.controller_role if role_dict['dpid'] != dp]
+        _new_roles.append({'dpid':dp, 'role':role})
+        self.controller_role = _new_roles
+
+        self.logger.info("Controller Role Reply received:")
+        self.logger.info("Datapath ID: %s", dp)
+        self.logger.info("Controller Role: %s", role)

@@ -120,8 +120,9 @@ class LoadController(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)
     def _role_reply_handler(self, ev):
+        self.logger.info(f'role reply: {ev=}')
         msg = ev.msg
-        dp = msg.dp
+        dp = msg.datapath
         role = msg.role
 
         _new_roles = [role_dict for role_dict in self.controller_role if role_dict['dpid'] != dp]

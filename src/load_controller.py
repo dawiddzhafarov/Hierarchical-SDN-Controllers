@@ -123,10 +123,20 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.logger.info(f'role reply: {ev=}')
         msg = ev.msg
         dp = msg.datapath
-        role = msg.role
+        match msg.role:
+            case 0:
+                role = ROLE.NOCHANGE
+            case 1:
+                role = ROLE.EQUAL
+            case 2:
+                role = ROLE.MASTER
+            case 3:
+                role = ROLE.SLAVE
+            case _:
+                self.logger.error('role unknown')
 
         _new_roles = [role_dict for role_dict in self.controller_role if role_dict['dpid'] != dp]
-        _new_roles.append({'dpid': dp, 'role': role})
+        _new_roles.append({'dpid': f'{dp}', 'role': role})
         self.controller_role = _new_roles
         self.logger.info("Controller Role Reply received:")
         self.logger.info("Datapath ID: %s", dp)

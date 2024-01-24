@@ -59,7 +59,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         #     dp.send_msg(msg)
         #     self.logger.info(f'sent init role request: {role} for switch: {dp}')
         #     self.controller_role.append({"dpid": dp, "role": role})
-        # self.start_serve()
+        self.start_serve()
 
     @set_ev_cls(stplib.EventPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -158,7 +158,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                 'cmd': f"{CMD.LOAD_UPDATE}",
                 'load': self.load_score
             })
-            self.global_socket.sendall(load_data)
+            self.global_socket.sendall(load_data.encode())
             _buffer = self.global_socket.recv(128)
             msg_lines = _buffer.decode('utf-8').splitlines()
             for _line in msg_lines:

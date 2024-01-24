@@ -66,7 +66,6 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             dp.send_msg(msg)
             self.logger.info(f'sent init role request: {role} for switch: {dp.id}')
             self.controller_role.append({"dpid": dp.id, "role": role})
-        self.start_serve()
         self._send_roles_to_master()
 
     @set_ev_cls(stplib.EventPacketIn, MAIN_DISPATCHER)
@@ -156,7 +155,10 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             thread1 = hub.spawn(self._sendingLoop)
             thread2 = hub.spawn(self._balance_loop)
             thread3 = hub.spawn(self._sendLoad)
-            hub.joinall([thread1, thread2, thread3])
+            self.threads.append(thread1)
+            self.threads.append(thread2)
+            self.threads.append(thread3)
+
         except Exception as e:
             self.logger.info(f'exception in loop: {e=}')
             raise e

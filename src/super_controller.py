@@ -260,7 +260,7 @@ class SCWorker:
         with Timeout(TIMEOUT, False):
             while self.isActive:
                 try:
-                    _buffer = self.webSocket.recv(128)
+                    _buffer = self.webSocket.recv(1024)
 
                     if len(_buffer) == 0:
                         sleep(1)

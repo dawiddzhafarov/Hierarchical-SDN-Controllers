@@ -13,6 +13,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib import dpid as dpid_lib, hub
 from ryu.lib import stplib
+from ryu.lib import ofctl_v1_3 as ofctl
 from ryu.app import simple_switch_13
 import socket
 from ryu.topology import event
@@ -26,9 +27,7 @@ BETA = 1 - ALPHA
 
 class LoadController(simple_switch_13.SimpleSwitch13):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    _CONTEXTS = {'stplib': stplib.Stp,
-                 'rest': RestStatsApi
-                 }
+    _CONTEXTS = {'stplib': stplib.Stp}
 
     def __init__(self, *args, **kwargs):
         super(LoadController, self).__init__(*args, **kwargs)
@@ -41,7 +40,6 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.controller_role: list[dict[str, str]] = []
         self.stp = kwargs['stplib']
         self.name = kwargs.get('name', 'default')
-        self.rest = kwargs["rest"]
         logging.basicConfig(stream=stdout, level=logging.info)
 
         # Sample of stplib config.
@@ -79,8 +77,10 @@ class LoadController(simple_switch_13.SimpleSwitch13):
     def _event_switch_enter_handler(self, ev):
         dpid = ev.switch.dp.id
         self.logger.info(f'EventSwitchEnter: {dpid=}')
+        self._get_self_role(ev.switch.dp)
         self._request_controller_role(ev.switch.dp)
         self._send_roles_to_master()
+        self._get_self_role(ev.switch.dp)
         #self.add_dpid(dpid)
 
     @set_ev_cls(LBEventRoleChange, MAIN_DISPATCHER)
@@ -121,6 +121,10 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         )
         self.logger.info(f'sent role query for switch: {datapath} with body: {req}')
         datapath.send_msg(req)
+
+    def _get_self_role(self, datapath):
+        out = ofctl.get_role(datapath, waiters=datapath.id)
+        self.logger.info(f'magia: {out}')
 
     @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)
     def _role_reply_handler(self, ev):

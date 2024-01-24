@@ -25,7 +25,7 @@ basicConfig(stream=stdout, level=DEBUG)
 WORKER_LIMIT = 1024
 LOAD_THRESHOLD = 0.7
 TIME_BALANCING = 1
-
+TIMEOUT = 300
 
 class ROLE(StrEnum):
     """Roles for OpenFlow v1.3.
@@ -257,7 +257,7 @@ class SCWorker:
 
     def _receivingLoop(self) -> None:
         """Receiving loop for a client."""
-        with Timeout(10, False):
+        with Timeout(TIMEOUT, False):
             while self.isActive:
                 try:
                     _buffer = self.webSocket.recv(128)

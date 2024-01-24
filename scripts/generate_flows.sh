@@ -51,7 +51,7 @@ IFS=' ' read -r -a address_array <<< "$addresses"
 # Generate lines with the specified format and redirect to the output file
 for address in "${address_array[@]}"; do
   for ((i = 0; i < number; i++)); do
-    echo "-a $address -C 1 -c 10 -t 20000 -rp $port -T UDP"
+    echo "-a $address -C 1 -c 1 -t 10000 -rp $port -T UDP"
     port=$((port+1))
   done
   port=$((port+300))

@@ -27,12 +27,40 @@ LOAD_THRESHOLD = 0.7
 TIME_BALANCING = 1
 
 
-class ROLE(Enum):
+class ROLE(StrEnum):
+    """Roles for OpenFlow v1.3.
+
+    Enum:
+        master   -> MASTER
+        slave    -> SLAVE
+        equal    -> EQUAL
+        nochange -> NOCHANGE
+    """
     MASTER = auto()
     SLAVE = auto()
+    EQUAL = auto()
+    NOCHANGE = auto()
+
+    def __repr__(self):
+        return f"{self.name.upper()}"
 
 
 class CMD(StrEnum):
+    """Commands to exchange between super controller and domain controllers.
+
+    Enum:
+        keepalive     -> KEEPALIVE
+        workerid_set  -> WORKERID_SET
+        xdom_link_add -> XDOM_LINK_ADD
+        host_response -> HOST_RESPONSE
+        route_request -> ROUTE_REQUEST
+        route_result  -> ROUTE_RESULT
+        dpid_request  -> DPID_REQUEST
+        dpid_response -> DPID_RESPONSE
+        load_update   -> LOAD_UPDATE
+        role_change   -> ROLE_CHANGE
+        dpid_to_role  -> DPID_TO_ROLE
+    """
     KEEPALIVE = auto()
     WORKERID_SET = auto()
     XDOM_LINK_ADD = auto()
@@ -135,7 +163,7 @@ class SCWorker:
         self.isActive: bool = True
         self.workerID: int = -1
         self.loadScore: float = 0
-        self.dpid2role: dict[str, ROLE] = {} # TODO: this is lacking init state
+        self.dpid2role: dict[str, ROLE] = {}
         self._overseerController: SuperController | None = None
 
 
@@ -201,13 +229,18 @@ class SCWorker:
                 case CMD.LOAD_UPDATE:
                     load = msg['load']
                     logger.debug(f"Got load update to {load= }")
-                    self.loadScore = load
+                    self._overseerController.handleLoadUpdate(float(load), self.workerID)
+
+                case CMD.DPID_TO_ROLE:
+                    switches = msg['switches']
+                    logger.debug(f"Got role status for {switches= }")
+                    self._overseerController.handleDpidToRole(switches, self.workerID)
 
                 case _:
-                    logger.error(f"No such {msg= }.")
+                    logger.error(f"No such {msg= }")
 
 
-    def _sendingLoop(self):
+    def _sendingLoop(self) -> None:
         """Sending loop for a client."""
         try:
             while self.isActive:
@@ -373,21 +406,21 @@ class SuperController:
             if role == ROLE.MASTER.value and dpid in self.workers[free_worker_id].dpid2role.keys():
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
-                    'role': 2,
+                    'role': ROLE.SLAVE.value,
                     'dpid': dpid,
                 })
                 self.workers[busy_worker_id].sendMsg(msg)
                 self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
-                    'role': 1,
+                    'role': ROLE.MASTER.value,
                     'dpid': dpid,
                 })
                 self.workers[free_worker_id].sendMsg(msg)
                 self.workers[free_worker_id].dpid2role[dpid] = ROLE.MASTER
-                return None
 
-    def _sendingLoop(self):
+    def _sendingLoop(self) -> None:
+        """Sending loop for the server balancing task."""
         while True:
             for wid, worker in self.workers.items():
                 free_controller = None
@@ -413,14 +446,23 @@ class SuperController:
 
 
     def _getWorkerLink(self, src: str, dst: str) -> dict[str, dict[str, str | int]] | None:
+        """Get link between workers.
+
+        Args:
+            src: source part from the edge tuple in networkx path
+            dst: destination part from the edge tuple in networkx path
+
+        Returns:
+            link from xdom_links
+        """
         # convert a? to ?
-        src_agent_id = int(src[1:])
-        dst_agent_id = int(dst[1:])
+        src_worker_id = int(src[1:])
+        dst_worker_id = int(dst[1:])
 
         for glink in self.xdom_links:
             srcg = glink['src']
             dstg = glink['dst']
-            if srcg['worker_id'] == src_agent_id and dstg['worker_id'] == dst_agent_id:
+            if srcg['worker_id'] == src_worker_id and dstg['worker_id'] == dst_worker_id:
                 return glink
 
         return None
@@ -535,14 +577,39 @@ class SuperController:
 
 
     def handleDpidResponse(self, dpid: str | int, worker_id: int) -> None:
-        """Assign worker/domain controller to switch."""
+        """Assign worker/domain controller to switch.
+
+        Args:
+            dpid: DatapathID of a switch
+            worker_id: id of a worker to assign switch to
+        """
         for _link in self.xdom_links:
             if _link['src']['dpid'] == dpid:
                 _link['src']['worker_id'] = worker_id
 
             if _link['dst']['dpid'] == dpid:
                 _link['dst']['worker_id'] = worker_id
-    # . BEGIN SuperController utils {
+
+
+    def handleLoadUpdate(self, load: float, worker_id: int) -> None:
+        """Assign calculated load to worker/controller.
+
+        Args:
+            load: calculated by the controller self load
+            worker_id: id of a worker that it should be assigned to
+        """
+        self.workers[worker_id].loadScore = load
+
+
+    def handleDpidToRole(self, switches: list[dict[str, str]], worker_id: int) -> None:
+        """Assign calculated load to worker/controller.
+
+        Args:
+            switches: list of switches and roles of the controller this data was sent from
+            worker_id: id of a worker that it should be assigned to
+        """
+        self.workers[worker_id].dpid2role = {sw['dpid']: ROLE(sw['role'].lower()) for sw in switches}
+    # . END SuperController handlers }
 
 
 def sc_run() -> int:

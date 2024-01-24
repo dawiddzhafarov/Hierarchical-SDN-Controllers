@@ -124,8 +124,10 @@ class SimpleSwitch13(app_manager.RyuApp):
         dpid = ev.dpid
         role = ev.role
         # Role:
-        # 1: master
-        # 2: slave
+        # master: MASTER
+        # slave: SLAVE
+        # equal: EQUAL
+        # nochange: NOCHANGE
 
         switch = api.get_switch(self, dpid)
 
@@ -134,7 +136,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             ofp = dp.ofproto
             ofp_parser = dp.ofproto_parser
 
-            if role == 1:
+            if ROLE(role) == ROLE.MASTER:
                 role = ofp.OFPCR_ROLE_MASTER
 
             else:

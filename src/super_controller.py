@@ -200,7 +200,8 @@ class SCWorker:
 
                 case CMD.LOAD_UPDATE:
                     load = msg['load']
-                    self._overseerController.handleLoadUpdate(load, self.workerID)
+                    logger.debug(f"Got load update to {load= }")
+                    self.loadScore = load
 
                 case _:
                     logger.error(f"No such {msg= }.")
@@ -382,7 +383,6 @@ class SuperController:
                     'dpid': dpid,
                 })
                 self.workers[free_worker_id].sendMsg(msg)
-                # TODO: balancing is not finished?
                 return None
 
     def _sendingLoop(self):
@@ -541,9 +541,6 @@ class SuperController:
             if _link['dst']['dpid'] == dpid:
                 _link['dst']['worker_id'] = worker_id
     # . BEGIN SuperController utils {
-
-    def handleLoadBalance(self, load: int, worker_id: int) -> None:
-        self.workers[worker_id].loadScore = load
 
 
 def sc_run() -> int:

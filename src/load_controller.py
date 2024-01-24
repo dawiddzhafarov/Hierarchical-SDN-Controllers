@@ -112,7 +112,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         ofp_parser = datapath.ofproto_parser
         gen_id = random.randint(0, 10000)
         req = ofp_parser.OFPRoleRequest(
-            datapath, datapath.ofproto.OFPT_ROLE_REQUEST,
+            datapath, datapath.ofproto.OFPCR_ROLE_EQUAL,
             gen_id
         )
         self.logger.info(f'sent role query for switch: {datapath} with body: {req}')

@@ -377,12 +377,14 @@ class SuperController:
                     'dpid': dpid,
                 })
                 self.workers[busy_worker_id].sendMsg(msg)
+                self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': 1,
                     'dpid': dpid,
                 })
                 self.workers[free_worker_id].sendMsg(msg)
+                self.workers[free_worker_id].dpid2role[dpid] = ROLE.MASTER
                 return None
 
     def _sendingLoop(self):

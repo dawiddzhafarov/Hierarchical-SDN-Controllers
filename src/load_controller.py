@@ -19,11 +19,11 @@ from ryu.topology import event
 from aux_classes import LBEventRoleChange, get_ram_utilization, get_cpu_utilization
 from super_controller import ROLE, CMD
 from ryu.controller import dpset
-
+from ryu.app.ofctl_rest import RestStatsApi
 ALPHA = 0.5
 BETA = 1 - ALPHA
 
-class LoadController(simple_switch_13.SimpleSwitch13):
+class LoadController(simple_switch_13.SimpleSwitch13, RestStatsApi):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {'stplib': stplib.Stp,
                  'dpset': dpset.DPSet,

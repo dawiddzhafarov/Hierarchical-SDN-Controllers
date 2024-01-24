@@ -20,6 +20,8 @@ from aux_classes import LBEventRoleChange, get_ram_utilization, get_cpu_utilizat
 from super_controller import ROLE, CMD
 from ryu.controller import dpset
 from ryu.app.ofctl_rest import RestStatsApi
+from ryu.app.wsgi import WSGIApplication
+
 ALPHA = 0.5
 BETA = 1 - ALPHA
 
@@ -27,6 +29,7 @@ class LoadController(simple_switch_13.SimpleSwitch13, RestStatsApi):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {'stplib': stplib.Stp,
                  'dpset': dpset.DPSet,
+                 'wsgi': WSGIApplication
                  }
 
     def __init__(self, *args, **kwargs):

@@ -49,7 +49,6 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                   dpid_lib.str_to_dpid('0000000000000003'):
                   {'bridge': {'priority': 0xa000}}}
         self.stp.set_config(config)
-        sleep(15)
         # TODO: uncomment when checked that one controller is elected master upon first OPFIn arrival
         # switches = api.get_all_switch(self)
         # for switch in switches:

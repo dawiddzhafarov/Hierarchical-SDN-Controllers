@@ -43,7 +43,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.stp = kwargs['stplib']
         self.dpset = kwargs['dpset']
         self.name = kwargs.get('name', 'default')
-        self.gen_id = 0
+        self.gen_id = 2**32 - 1
         logging.basicConfig(stream=stdout, level=logging.info)
 
         # Sample of stplib config.

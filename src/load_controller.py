@@ -34,7 +34,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.controller_role: list[dict[str, str]] = []
         self.stp = kwargs['stplib']
         self.name = kwargs.get('name', 'default')
-        logging.basicConfig(stream=stdout, level=logging.DEBUG)
+        logging.basicConfig(stream=stdout, level=logging.info)
 
         # Sample of stplib config.
         #  please refer to stplib.Stp.set_config() for details.
@@ -57,7 +57,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         #     gen_id = random.randint(0, 10000)
         #     msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
         #     dp.send_msg(msg)
-        #     self.logger.debug(f'sent init role request: {role} for switch: {dp}')
+        #     self.logger.info(f'sent init role request: {role} for switch: {dp}')
         #     self.controller_role.append({"dpid": dp, "role": role})
         # self.start_serve()
 
@@ -69,7 +69,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
     @set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
         dpid = ev.switch.dp.id
-        self.logger.debug(f'EventSwitchEnter: {dpid=}')
+        self.logger.info(f'EventSwitchEnter: {dpid=}')
         #self.add_dpid(dpid)
 
     @set_ev_cls(LBEventRoleChange, MAIN_DISPATCHER)
@@ -77,7 +77,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         """
         Change role for a given switch based on DPID provided in LBEventRoleChange event
         """
-        self.logger.debug(f'Global role change request: {ev}')
+        self.logger.info(f'Global role change request: {ev}')
         dpid = ev.dpid
         role = ev.role
 
@@ -95,7 +95,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             # generate new generation id
             gen_id = random.randint(0, 10000)
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
-            self.logger.debug(f'sent role change request: {role} for switch: {dp=}')
+            self.logger.info(f'sent role change request: {role} for switch: {dp=}')
             dp.send_msg(msg)
 
     def _request_controller_role(self, datapath):
@@ -108,7 +108,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             datapath, datapath.ofproto.OFPT_ROLE_REQUEST,
             gen_id
         )
-        self.logger.debug(f'sent role query for switch: {datapath} with body: {req}')
+        self.logger.info(f'sent role query for switch: {datapath} with body: {req}')
         datapath.send_msg(req)
 
     @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)
@@ -167,11 +167,11 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                     role = msg['role']
                     dpid = msg['dpid']
                     if role == 0:
-                        self.logger.debug("no need to change role.")
+                        self.logger.info("no need to change role.")
                         continue
                     else:
                         role_event = LBEventRoleChange(dpid, role)
-                        self.logger.debug(f"role event change -> {role}")
+                        self.logger.info(f"role event change -> {role}")
                         # below sends event to _role_change_handler observer
                         self.send_event_to_observers(role_event)
             sleep(seconds=1)

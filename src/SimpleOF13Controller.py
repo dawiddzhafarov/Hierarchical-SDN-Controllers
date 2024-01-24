@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from sys import stdout
+
 import psutil
 import socket
 import struct
@@ -38,7 +40,7 @@ from aux_classes import LBEventRoleChange
 from super_controller import ROLE, CMD
 
 LOG = logging.getLogger("load_balance_lib")
-
+logging.basicConfig(stream=stdout, level=logging.DEBUG)
 ALPHA = 0.5
 BETA = 1 - ALPHA
 

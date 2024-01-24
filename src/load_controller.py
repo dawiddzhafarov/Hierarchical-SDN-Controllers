@@ -66,6 +66,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             dp.send_msg(msg)
             self.logger.info(f'sent init role request: {role} for switch: {dp.id}')
             self.controller_role.append({"dpid": dp.id, "role": role})
+        self.start_serve()
         self._send_roles_to_master()
 
     @set_ev_cls(stplib.EventPacketIn, MAIN_DISPATCHER)

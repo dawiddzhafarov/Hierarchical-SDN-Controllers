@@ -70,7 +70,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
     def _event_switch_enter_handler(self, ev):
         dpid = ev.switch.dp.id
         self.logger.debug(f'EventSwitchEnter: {dpid=}')
-        self.add_dpid(dpid)
+        #self.add_dpid(dpid)
 
     @set_ev_cls(LBEventRoleChange, MAIN_DISPATCHER)
     def _role_change_handler(self, ev):

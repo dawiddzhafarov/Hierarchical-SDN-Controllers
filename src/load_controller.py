@@ -1,8 +1,10 @@
 import json
 import logging
 import random
+from queue import Empty
 from sys import stdout
 
+from eventlet import Queue
 from ryu.controller import ofp_event
 from ryu.lib.hub import sleep
 from ryu.topology import api
@@ -34,6 +36,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.server_port = kwargs.get("server_port", 10807)
         self.global_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.OFPIN_IN_COUNTER: int = 0
+        self.sendQueue: Queue | None = Queue(32)
         self.controller_role: list[dict[str, str]] = []
         self.stp = kwargs['stplib']
         self.dpset = kwargs['dpset']
@@ -145,12 +148,14 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             'cmd': f"{CMD.DPID_TO_ROLE}",
             'switches': self.controller_role
         })
-        self.global_socket.sendall(dpid2role_data.encode())
+        self.send_msg_to_controller(dpid2role_data.encode())
 
     def start_serve(self):
         try:
             self.global_socket.connect((self.server_addr, self.server_port))
-            hub.spawn(self._balance_loop)
+            thread1 = hub.spawn(self._sendingLoop)
+            thread2 = hub.spawn(self._balance_loop)
+            hub.joinall([thread1, thread2])
         except Exception as e:
             self.logger.info(f'exception in loop: {e=}')
             raise e
@@ -166,20 +171,35 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             'cmd': f"{CMD.DPID_REQUEST}",
             'dpid': f'{dpid}'
         })
-        self.global_socket.sendall(dp_data)
+        self.send_msg_to_controller(dp_data)
 
     def _send_roles_to_master(self):
         dpid2role_data = json.dumps({
             'cmd': f"{CMD.DPID_TO_ROLE}",
             'switches': self.controller_role
         })
-        self.global_socket.sendall(dpid2role_data.encode())
+        self.send_msg_to_controller(dpid2role_data)
 
-    def _balance_loop(self):
-        """
-        keep sending cpu usage and memory usage
-        and receive global controller decision
-        """
+    def _sendingLoop(self) -> None:
+        """Sending loop for a client."""
+        try:
+            while True:
+                if self.sendQueue is not None:
+                    buf = self.sendQueue.get()
+                    self.global_socket.sendall(buf.encode())
+                    sleep(1)
+        finally:
+            q = self.sendQueue
+            self.sendQueue = None
+
+            try:
+                if q is not None:
+                    while q.get(block=False):
+                        pass
+            except Empty:
+                pass
+
+    def _sendLoad(self):
         while True:
             cpu_util = get_cpu_utilization()
             mem_util = get_ram_utilization()
@@ -188,7 +208,15 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                 'cmd': f"{CMD.LOAD_UPDATE}",
                 'load': self.load_score
             })
-            self.global_socket.sendall(load_data.encode())
+            self.send_msg_to_controller(load_data)
+            sleep(3)
+
+    def _balance_loop(self):
+        """
+        keep sending cpu usage and memory usage
+        and receive global controller decision
+        """
+        while True:
             _buffer = self.global_socket.recv(128)
             msg_lines = _buffer.decode('utf-8').splitlines()
             for _line in msg_lines:
@@ -205,3 +233,6 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                         # below sends event to _role_change_handler observer
                         self.send_event_to_observers(role_event)
             sleep(seconds=1)
+
+    def send_msg_to_controller(self, msg):
+        self.sendQueue.put(msg)

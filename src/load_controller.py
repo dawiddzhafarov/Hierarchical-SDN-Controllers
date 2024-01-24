@@ -16,13 +16,16 @@ import socket
 from ryu.topology import event
 from aux_classes import LBEventRoleChange, get_ram_utilization, get_cpu_utilization
 from super_controller import ROLE, CMD
+from ryu.controller import dpset
 
 ALPHA = 0.5
 BETA = 1 - ALPHA
 
 class LoadController(simple_switch_13.SimpleSwitch13):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    _CONTEXTS = {'stplib': stplib.Stp}
+    _CONTEXTS = {'stplib': stplib.Stp,
+                 'dpset': dpset.DPSet,
+                 }
 
     def __init__(self, *args, **kwargs):
         super(LoadController, self).__init__(*args, **kwargs)
@@ -33,6 +36,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.OFPIN_IN_COUNTER: int = 0
         self.controller_role: list[dict[str, str]] = []
         self.stp = kwargs['stplib']
+        self.dpset = kwargs['dpset']
         self.name = kwargs.get('name', 'default')
         logging.basicConfig(stream=stdout, level=logging.info)
 
@@ -47,9 +51,10 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.stp.set_config(config)
         sleep(15)
         # TODO: uncomment when checked that one controller is elected master upon first OPFIn arrival
-        switches = api.get_all_switch(self)
-        for switch in switches:
-            dp = switch.dp
+        # switches = api.get_all_switch(self)
+        # for switch in switches:
+        #     dp = switch.dp
+        for dp, _ in self.dpset.get_all():
             ofp = dp.ofproto
             ofp_parser = dp.ofproto_parser
             role = ofp.OFPCR_ROLE_SLAVE

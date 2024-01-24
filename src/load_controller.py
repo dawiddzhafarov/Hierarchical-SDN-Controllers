@@ -43,6 +43,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.stp = kwargs['stplib']
         self.dpset = kwargs['dpset']
         self.name = kwargs.get('name', 'default')
+        self.gen_id = 0
         logging.basicConfig(stream=stdout, level=logging.info)
 
         # Sample of stplib config.
@@ -63,7 +64,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             ofp_parser = dp.ofproto_parser
             role = ofp.OFPCR_ROLE_SLAVE
             # generate new generation id
-            gen_id = random.randint(0, 10000)
+            gen_id = self.gen_id
+            self.gen_id += 1
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
             dp.send_msg(msg)
             self.logger.info(f'sent init role request: {role} for switch: {dp.id}')
@@ -107,7 +109,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             else:
                 role = ofp.OFPCR_ROLE_SLAVE
             # generate new generation id
-            gen_id = random.randint(0, 10000)
+            gen_id = self.gen_id
+            self.gen_id += 1
             msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
             self.logger.info(f'sent role change request: {role} for switch: {dp=}')
             dp.send_msg(msg)
@@ -117,7 +120,9 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         Request controller role for a given DPID
         """
         ofp_parser = datapath.ofproto_parser
-        gen_id = random.randint(0, 10000)
+
+        gen_id = self.gen_id
+        self.gen_id += 1
         req = ofp_parser.OFPRoleRequest(
             datapath, datapath.ofproto.OFPCR_ROLE_MASTER,
             gen_id

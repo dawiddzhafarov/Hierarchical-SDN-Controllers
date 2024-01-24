@@ -45,21 +45,22 @@ class LoadController(simple_switch_13.SimpleSwitch13):
                   dpid_lib.str_to_dpid('0000000000000003'):
                   {'bridge': {'priority': 0xa000}}}
         self.stp.set_config(config)
-
+        sleep(15)
         # TODO: uncomment when checked that one controller is elected master upon first OPFIn arrival
-        # switches = api.get_all_switch(self)
-        # for switch in switches:
-        #     dp = switch.dp
-        #     ofp = dp.ofproto
-        #     ofp_parser = dp.ofproto_parser
-        #     role = ofp.OFPCR_ROLE_SLAVE
-        #     # generate new generation id
-        #     gen_id = random.randint(0, 10000)
-        #     msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
-        #     dp.send_msg(msg)
-        #     self.logger.info(f'sent init role request: {role} for switch: {dp}')
-        #     self.controller_role.append({"dpid": dp, "role": role})
+        switches = api.get_all_switch(self)
+        for switch in switches:
+            dp = switch.dp
+            ofp = dp.ofproto
+            ofp_parser = dp.ofproto_parser
+            role = ofp.OFPCR_ROLE_SLAVE
+            # generate new generation id
+            gen_id = random.randint(0, 10000)
+            msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
+            dp.send_msg(msg)
+            self.logger.info(f'sent init role request: {role} for switch: {dp}')
+            self.controller_role.append({"dpid": dp, "role": role})
         self.start_serve()
+        self._send_roles_to_master()
 
     @set_ev_cls(stplib.EventPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -120,16 +121,21 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         _new_roles = [role_dict for role_dict in self.controller_role if role_dict['dpid'] != dp]
         _new_roles.append({'dpid': dp, 'role': role})
         self.controller_role = _new_roles
-
         self.logger.info("Controller Role Reply received:")
         self.logger.info("Datapath ID: %s", dp)
         self.logger.info("Controller Role: %s", role)
+        dpid2role_data = json.dumps({
+            'cmd': f"{CMD.DPID_TO_ROLE}",
+            'switches': self.controller_role
+        })
+        self.global_socket.sendall(dpid2role_data.encode())
 
     def start_serve(self):
         try:
             self.global_socket.connect((self.server_addr, self.server_port))
             hub.spawn(self._balance_loop)
         except Exception as e:
+            self.logger.info(f'exception in loop: {e=}')
             raise e
 
     def add_dpid(self, dpid: int):
@@ -144,6 +150,13 @@ class LoadController(simple_switch_13.SimpleSwitch13):
             'dpid': f'{dpid}'
         })
         self.global_socket.sendall(dp_data)
+
+    def _send_roles_to_master(self):
+        dpid2role_data = json.dumps({
+            'cmd': f"{CMD.DPID_TO_ROLE}",
+            'switches': self.controller_role
+        })
+        self.global_socket.sendall(dpid2role_data.encode())
 
     def _balance_loop(self):
         """

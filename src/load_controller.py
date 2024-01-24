@@ -17,8 +17,8 @@ from ryu.lib.packet import ethernet
 from ryu.app import simple_switch_13
 import socket
 from ryu.topology import event
-from src.aux_classes import LBEventRoleChange, get_ram_utilization, get_cpu_utilization
-from src.super_controller import ROLE, CMD
+from aux_classes import LBEventRoleChange, get_ram_utilization, get_cpu_utilization
+from super_controller import ROLE, CMD
 
 ALPHA = 0.5
 BETA = 1 - ALPHA
@@ -52,18 +52,18 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         self.stp.set_config(config)
 
         # TODO: uncomment when checked that one controller is elected master upon first OPFIn arrival
-        switches = api.get_all_switch(self)
-        for switch in switches:
-            dp = switch.dp
-            ofp = dp.ofproto
-            ofp_parser = dp.ofproto_parser
-            role = ofp.OFPCR_ROLE_SLAVE
+   #     switches = api.get_all_switch(self)
+    #    for switch in switches:
+     #       dp = switch.dp
+      #      ofp = dp.ofproto
+       #     ofp_parser = dp.ofproto_parser
+        #    role = ofp.OFPCR_ROLE_SLAVE
             # generate new generation id
-            gen_id = random.randint(0, 10000)
-            msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
-            dp.send_msg(msg)
-            self.logger.debug(f'sent init role request: {role} for switch: {dp}')
-            self.controller_role.append({"dpid": dp, "role": role})
+         #   gen_id = random.randint(0, 10000)
+           # msg = ofp_parser.OFPRoleRequest(dp, role, gen_id)
+          #  dp.send_msg(msg)
+          #  self.logger.debug(f'sent init role request: {role} for switch: {dp}')
+           # self.controller_role.append({"dpid": dp, "role": role})
 
         # self.start_serve()
     def delete_flow(self, datapath):
@@ -122,9 +122,9 @@ class LoadController(simple_switch_13.SimpleSwitch13):
 
     @set_ev_cls(event.EventSwitchEnter, MAIN_DISPATCHER)
     def _event_switch_enter_handler(self, ev):
-        dpid = ev.dp.id
+        dpid = ev.switch.dp
         self.logger.debug(f'EventSwitchEnter: {dpid=}')
-        self.add_dpid(dpid)
+        #self.add_dpid(dpid)
 
     @set_ev_cls(LBEventRoleChange, MAIN_DISPATCHER)
     def _role_change_handler(self, ev):
@@ -208,18 +208,19 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         except Exception as e:
             raise e
 
-    def add_dpid(self, dpid: int):
+    def add_dpid(self, dpid):
         """
         Send data over socket:
         1) send header (HeaderStruct) with integer value 1,
            which informs that next struct contains DPID
         2) send DPID (DPStruct) with DPID value
         """
+        self.logger.debug(f'{dpid=}')
         dp_data = json.dumps({
-            'cmd': f"{CMD.DPID_REQUEST}",
-            'dpid': dpid
+            'cmd': f"{CMD.DPID_RESPONSE}",
+            'dpid': f'{dpid}'
         })
-        self.global_socket.sendall(dp_data.encode('utf-8'))
+       # self.global_socket.sendall()
 
     def _balance_loop(self):
         """

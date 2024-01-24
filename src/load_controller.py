@@ -75,11 +75,7 @@ class LoadController(simple_switch_13.SimpleSwitch13):
     def _event_switch_enter_handler(self, ev):
         dpid = ev.switch.dp.id
         self.logger.info(f'EventSwitchEnter: {dpid=}')
-        try:
-            self._request_controller_role(ev.switch.dp)
-        except Exception as e:
-            self.logger.debug(f'wrong dpid: {e}')
-            self._request_controller_role(ev.switch.dp.id)
+        self._request_controller_role(ev.switch.dp)
         self._send_roles_to_master()
         #self.add_dpid(dpid)
 

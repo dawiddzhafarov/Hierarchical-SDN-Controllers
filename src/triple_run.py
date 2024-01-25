@@ -10,7 +10,7 @@ from itertools import permutations, groupby
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-from mininet.net import Mininet
+from mininet.net import Controller, Mininet
 from mininet.node import RemoteController
 from mininet.topo import Topo
 from mininet.cli import CLI
@@ -73,7 +73,8 @@ def simple_run(topo: Topo):
     start_net(net)
     net.staticArp()
     for name, node in net.nameToNode.items():
-        print(f"{name} :{type(node)}: {node.connected()}")
+        if type(node) != Controller:
+            print(f"{name} :{type(node)}: {node.connected()}")
 
     info('*** Running CLI\n')
     CLI(net)

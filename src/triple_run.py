@@ -29,9 +29,9 @@ def simple_run(topo: Topo):
     #                                          port=6653),
     net = Mininet(switch=OVSSwitch)
 
-    c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6633)
-    c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6634)
-    c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6635)
+    c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
+    c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
+    c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
     controllers = [c1, c2, c3]
     controller_perms = list(permutations(controllers))
 
@@ -44,7 +44,7 @@ def simple_run(topo: Topo):
 
     info('*** Starting network\n')
     net.start()
-    net.staticArp()
+    # net.staticArp()
 
     info('*** Running CLI\n')
     CLI(net)

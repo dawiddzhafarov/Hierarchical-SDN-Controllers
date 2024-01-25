@@ -55,13 +55,13 @@ def simple_run(topo: Topo):
                   # controller=lambda name: RemoteController(name,
                   #                                          ip='127.0.0.1',
                   #                                          port=6653),
-    net = Mininet(topo=topo())
+    net = Mininet()
 
     c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
     c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
     c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
 
-    # net.build()
+    net.buildFromTopo(topo())
     info('*** Starting network\n')
     # for c in controllers:
     #     c.start()

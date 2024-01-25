@@ -31,7 +31,7 @@ def simple_run(topo: Topo):
                   switch=OVSSwitch)
 
     # c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
-    c1 = net.getNodeByName('c1')
+    c1 = net.controllers[0]
     c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
     c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
     controllers = [c1, c2, c3]

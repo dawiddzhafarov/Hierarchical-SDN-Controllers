@@ -25,7 +25,7 @@ basicConfig(stream=stdout, level=DEBUG)
 WORKER_LIMIT = 1024
 LOAD_THRESHOLD = 0.7
 TIME_BALANCING = 1
-TIMEOUT = 300
+TIMEOUT = 600
 
 class ROLE(StrEnum):
     """Roles for OpenFlow v1.3.
@@ -403,6 +403,7 @@ class SuperController:
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
             if role [ROLE.MASTER.value, ROLE.SLAVE.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
+                logger.debug(f"Change role on worker{busy_worker_id} to SLAVE")
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': ROLE.SLAVE.value,
@@ -410,6 +411,7 @@ class SuperController:
                 })
                 self.workers[busy_worker_id].sendMsg(msg)
                 self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
+                logger.debug(f"Change role on worker{free_worker_id} to MASTER")
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': ROLE.MASTER.value,
@@ -417,6 +419,8 @@ class SuperController:
                 })
                 self.workers[free_worker_id].sendMsg(msg)
                 self.workers[free_worker_id].dpid2role[dpid] = ROLE.MASTER
+                break # break after first change
+
 
     def _sendingLoop(self) -> None:
         """Sending loop for the server balancing task."""

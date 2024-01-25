@@ -404,15 +404,17 @@ class SuperController:
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
             if role in [ROLE.MASTER.value, ROLE.EQUAL.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
-                logger.debug(f"Change role on worker{busy_worker_id} to SLAVE")
-                msg = json.dumps({
-                    'cmd': f"{CMD.ROLE_CHANGE}",
-                    'role': ROLE.SLAVE.value,
-                    'dpid': dpid,
-                })
-                self.workers[busy_worker_id].sendMsg(msg)
-                self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
-                logger.debug(f"Change role on worker{free_worker_id} to MASTER")
+                logger.debug(f"Change role on worker{busy_worker_id} to SLAVE for {dpid= }")
+                # NOTE: we cannot explicitly tell the switch that now controller is SLAVE
+                # NOTE: it becomes the SLAVE once another becomes MASTER
+                # msg = json.dumps({
+                #     'cmd': f"{CMD.ROLE_CHANGE}",
+                #     'role': ROLE.SLAVE.value,
+                #     'dpid': dpid,
+                # })
+                # self.workers[busy_worker_id].sendMsg(msg)
+                # self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
+                logger.debug(f"Change role on worker{free_worker_id} to MASTER for {dpid= }")
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': ROLE.MASTER.value,

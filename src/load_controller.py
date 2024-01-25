@@ -62,7 +62,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         for dp, _ in self.dpset.get_all():
             ofp = dp.ofproto
             ofp_parser = dp.ofproto_parser
-            role = ofp.OFPCR_ROLE_SLAVE
+            # NOTE: we always want to become the master on init
+            role = ofp.OFPCR_ROLE_MASTER
             # generate new generation id
             gen_id = self.gen_id
             self.gen_id += 1
@@ -106,8 +107,8 @@ class LoadController(simple_switch_13.SimpleSwitch13):
 
             if ROLE(role) == ROLE.MASTER:
                 role = ofp.OFPCR_ROLE_MASTER
-            else:
-                role = ofp.OFPCR_ROLE_SLAVE
+            # else:
+            #     role = ofp.OFPCR_ROLE_SLAVE
             # generate new generation id
             gen_id = self.gen_id
             self.gen_id += 1
@@ -234,14 +235,14 @@ class LoadController(simple_switch_13.SimpleSwitch13):
         and receive global controller decision
         """
         while True:
-            _buffer = self.global_socket.recv(128)
+            _buffer = self.global_socket.recv(1024)
             msg_lines = _buffer.decode('utf-8').splitlines()
             for _line in msg_lines:
                 msg = json.loads(_line)
-                if msg['cmd'] == CMD.ROLE_CHANGE:
+                if CMD(msg['cmd']) == CMD.ROLE_CHANGE:
                     role = msg['role']
                     dpid = msg['dpid']
-                    if role == 0:
+                    if role == ROLE.NOCHANGE.value:
                         self.logger.info("no need to change role.")
                         continue
                     else:

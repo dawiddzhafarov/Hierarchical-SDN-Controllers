@@ -35,7 +35,7 @@ def simple_run(topo: Topo):
     controllers = [c1, c2, c3]
     controller_perms = list(permutations(controllers))
 
-    net.buildFromTopo(topo)
+    net.buildFromTopo(topo())
     for c in controllers:
         c.start()
 

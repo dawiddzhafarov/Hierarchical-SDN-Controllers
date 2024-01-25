@@ -5,6 +5,7 @@ Base topology for testing hierarchical SDN controller setup
 """
 
 from mininet.topo import Topo
+from mininet.node import OVSSwitch
 
 
 class AbileneModTopo(Topo):
@@ -27,16 +28,16 @@ class AbileneModTopo(Topo):
         h10 = self.addHost('h_nyc')
 
         # add switches
-        s1  = self.addSwitch('sw_sea', dpid="00:00:00:00:00:00:00:01")
-        s2  = self.addSwitch('sw_sjc', dpid="00:00:00:00:00:00:00:02")
-        s3  = self.addSwitch('sw_den', dpid="00:00:00:00:00:00:00:03")
-        s4  = self.addSwitch('sw_lax', dpid="00:00:00:00:00:00:00:04")
-        s5  = self.addSwitch('sw_mci', dpid="00:00:00:00:00:00:00:05")
-        s6  = self.addSwitch('sw_hou', dpid="00:00:00:00:00:00:00:06")
-        s7  = self.addSwitch('sw_ord', dpid="00:00:00:00:00:00:00:07")
-        s8  = self.addSwitch('sw_atl', dpid="00:00:00:00:00:00:00:08")
-        s9  = self.addSwitch('sw_iad', dpid="00:00:00:00:00:00:00:09")
-        s10 = self.addSwitch('sw_nyc', dpid="00:00:00:00:00:00:00:10")
+        s1  = self.addSwitch('sw_sea', dpid="00:00:00:00:00:00:00:01", cls=OVSSwitch, protocols="OpenFlow13")
+        s2  = self.addSwitch('sw_sjc', dpid="00:00:00:00:00:00:00:02", cls=OVSSwitch, protocols="OpenFlow13")
+        s3  = self.addSwitch('sw_den', dpid="00:00:00:00:00:00:00:03", cls=OVSSwitch, protocols="OpenFlow13")
+        s4  = self.addSwitch('sw_lax', dpid="00:00:00:00:00:00:00:04", cls=OVSSwitch, protocols="OpenFlow13")
+        s5  = self.addSwitch('sw_mci', dpid="00:00:00:00:00:00:00:05", cls=OVSSwitch, protocols="OpenFlow13")
+        s6  = self.addSwitch('sw_hou', dpid="00:00:00:00:00:00:00:06", cls=OVSSwitch, protocols="OpenFlow13")
+        s7  = self.addSwitch('sw_ord', dpid="00:00:00:00:00:00:00:07", cls=OVSSwitch, protocols="OpenFlow13")
+        s8  = self.addSwitch('sw_atl', dpid="00:00:00:00:00:00:00:08", cls=OVSSwitch, protocols="OpenFlow13")
+        s9  = self.addSwitch('sw_iad', dpid="00:00:00:00:00:00:00:09", cls=OVSSwitch, protocols="OpenFlow13")
+        s10 = self.addSwitch('sw_nyc', dpid="00:00:00:00:00:00:00:10", cls=OVSSwitch, protocols="OpenFlow13")
 
         # basic setup hosts behind switches
         self.addLink(h1,  s1,  addr1="10:00:00:00:01:01", addr2="00:00:00:00:01:ff")

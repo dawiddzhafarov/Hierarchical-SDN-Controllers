@@ -11,7 +11,7 @@ from itertools import permutations
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from mininet.net import Mininet
-from mininet.node import RemoteController, OVSSwitch
+from mininet.node import OVSKernelSwitch, RemoteController
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
@@ -24,27 +24,25 @@ def simple_run(topo: Topo):
     "Basic runner script."
 
     info('*** Creating topology\n')
-    net = Mininet(topo=topo(),
-                  controller=lambda name: RemoteController(name,
-                                                           ip='127.0.0.1',
-                                                           port=6653),
-                  switch=OVSSwitch)
+                  # controller=lambda name: RemoteController(name,
+                  #                                          ip='127.0.0.1',
+                  #                                          port=6653),
+    net = Mininet(topo=topo())
 
-    # c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
-    c1 = net.controllers[0]
+    c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
     c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
     c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
     controllers = [c1, c2, c3]
     controller_perms = list(permutations(controllers))
 
-    # net.buildFromTopo(topo())
+    net.build()
+    info('*** Starting network\n')
     for c in controllers:
         c.start()
 
     for idx, sw in enumerate(net.switches):
         sw.start(list(controller_perms[idx % 6]))
 
-    info('*** Starting network\n')
     # net.start()
     # net.staticArp()
 

@@ -11,7 +11,7 @@ from itertools import permutations, groupby
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from mininet.net import Mininet
-from mininet.node import RemoteController, Switch
+from mininet.node import RemoteController, OVSSwitch
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
@@ -71,9 +71,9 @@ def simple_run(topo: Topo):
     #     sw.start(list(controller_perms[idx % 6]))
 
     start_net(net)
-    net.staticArp()
+    # net.staticArp()
     for name, node in net.nameToNode.items():
-        if type(node) == Switch:
+        if type(node) == OVSSwitch:
             print(f"{name} :{type(node)}: {node.connected()}")
 
     info('*** Running CLI\n')

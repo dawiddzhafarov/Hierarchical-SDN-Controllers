@@ -498,7 +498,10 @@ class SuperController:
         for _, worker in self.workers.items():
             loads.append(worker.loadScore)
 
-        self.load_avg = sum(loads) / len(loads)
+        if len(loads) != 0:
+            self.load_avg = sum(loads) / len(loads)
+        else:
+            self.load_avg = STARTING_LOAD_THRESHOLD
     # . END SuperController utils }
 
 

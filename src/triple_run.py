@@ -71,9 +71,9 @@ def simple_run(topo: Topo):
     #     sw.start(list(controller_perms[idx % 6]))
 
     start_net(net)
-    # net.staticArp()
-    # for name, node in net.nameToNode.items():
-    #     print(f"{name} :: {node.connected()}")
+    net.staticArp()
+    for name, node in net.nameToNode.items():
+        print(f"{name} :{type(node)}: {node.connected()}")
 
     info('*** Running CLI\n')
     CLI(net)

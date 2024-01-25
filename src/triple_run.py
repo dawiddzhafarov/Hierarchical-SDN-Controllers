@@ -24,18 +24,20 @@ def simple_run(topo: Topo):
     "Basic runner script."
 
     info('*** Creating topology\n')
-    # controller=lambda name: RemoteController(name,
-    #                                          ip='127.0.0.1',
-    #                                          port=6653),
-    net = Mininet(switch=OVSSwitch)
+    net = Mininet(topo=topo(),
+                  controller=lambda name: RemoteController(name,
+                                                           ip='127.0.0.1',
+                                                           port=6653),
+                  switch=OVSSwitch)
 
-    c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
+    # c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
+    c1 = net.getNodeByName('c1')
     c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
     c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
     controllers = [c1, c2, c3]
     controller_perms = list(permutations(controllers))
 
-    net.buildFromTopo(topo())
+    # net.buildFromTopo(topo())
     for c in controllers:
         c.start()
 
@@ -43,7 +45,7 @@ def simple_run(topo: Topo):
         sw.start(list(controller_perms[idx % 6]))
 
     info('*** Starting network\n')
-    net.start()
+    # net.start()
     # net.staticArp()
 
     info('*** Running CLI\n')

@@ -203,32 +203,32 @@ class SCWorker:
 
                 case CMD.XDOM_LINK_ADD:
                     src, dst = msg['src'], msg['dst']
-                    logger.debug(f"Got cross-domain link message: {src= }, {dst= }")
+                    logger.debug(f"Got cross-domain link message from {self.workerID}: {src= }, {dst= }")
                     self._overseerController.handleXDomLinkAdd(src, dst, self.workerID)
 
                 case CMD.HOST_RESPONSE:
                     host = msg['host']
-                    logger.debug(f"Got host to worker assignment msg for {host= }")
+                    logger.debug(f"Got host to worker assignment from {self.workerID} for {host= }")
                     self._overseerController.handleHostResponse(host, self.workerID)
 
                 case CMD.ROUTE_REQUEST:
                     dst_host = msg['dst']
-                    logger.debug(f"Got request for route to {dst_host= }")
+                    logger.debug(f"Got request from {self.workerID} for route to {dst_host= }")
                     self._overseerController.handleRouteRequest(dst_host, self.workerID)
 
                 case CMD.DPID_RESPONSE:
                     dpid = msg['dpid']
-                    logger.debug(f"Got switch to worker assignment msg for {dpid= }")
+                    logger.debug(f"Got switch to worker assignment msg from {self.workerID} for {dpid= }")
                     self._overseerController.handleDpidResponse(dpid, self.workerID)
 
                 case CMD.LOAD_UPDATE:
                     load = msg['load']
-                    logger.debug(f"Got load update to {load= }")
+                    logger.debug(f"Got load update from worker{self.workerID}: {load= }")
                     self._overseerController.handleLoadUpdate(float(load), self.workerID)
 
                 case CMD.DPID_TO_ROLE:
                     switches = msg['switches']
-                    logger.debug(f"Got role status for {switches= }")
+                    logger.debug(f"Got role status from worker{self.workerID} for {switches= }")
                     self._overseerController.handleDpidToRole(switches, self.workerID)
 
                 case _:
@@ -286,6 +286,7 @@ class SCWorker:
         SCWSEventBase.joinAll([thread1, thread2])
 
 
+    @property
     def numControlledSwitches(self) -> int:
         """Calculate the number of switches that have this controlled as master.
 
@@ -294,7 +295,7 @@ class SCWorker:
         """
         result = 0
         for k in self.dpid2role:
-            result += 1 if self.dpid2role[k] == ROLE.MASTER else 0
+            result += 1 if self.dpid2role[k] in [ROLE.MASTER, ROLE.EQUAL] else 0
         return result
 
     def close(self) -> None:
@@ -401,7 +402,7 @@ class SuperController:
             free_worker_id: id of a free controller/worker
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
-            if role == ROLE.MASTER.value and dpid in self.workers[free_worker_id].dpid2role.keys():
+            if role [ROLE.MASTER.value, ROLE.SLAVE.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': ROLE.SLAVE.value,

@@ -16,16 +16,16 @@ from socket import socket
 import networkx as nx
 from eventlet import Timeout, listen, spawn
 from eventlet.queue import Empty, Queue
-from eventlet.greenthread import GreenletExit, GreenThread, sleep
-
+from eventlet.greenthread import GreenThread, sleep
+from greenlet import GreenletExit
 
 logger = getLogger("SDN_SuperController")
 basicConfig(stream=stdout, level=DEBUG)
 
 WORKER_LIMIT = 1024
-LOAD_THRESHOLD = 0.7
+STARTING_LOAD_THRESHOLD = 10.0
 TIME_BALANCING = 1
-
+TIMEOUT = 600
 
 class ROLE(StrEnum):
     """Roles for OpenFlow v1.3.
@@ -203,32 +203,32 @@ class SCWorker:
 
                 case CMD.XDOM_LINK_ADD:
                     src, dst = msg['src'], msg['dst']
-                    logger.debug(f"Got cross-domain link message: {src= }, {dst= }")
+                    logger.debug(f"Got cross-domain link message from {self.workerID}: {src= }, {dst= }")
                     self._overseerController.handleXDomLinkAdd(src, dst, self.workerID)
 
                 case CMD.HOST_RESPONSE:
                     host = msg['host']
-                    logger.debug(f"Got host to worker assignment msg for {host= }")
+                    logger.debug(f"Got host to worker assignment from {self.workerID} for {host= }")
                     self._overseerController.handleHostResponse(host, self.workerID)
 
                 case CMD.ROUTE_REQUEST:
                     dst_host = msg['dst']
-                    logger.debug(f"Got request for route to {dst_host= }")
+                    logger.debug(f"Got request from {self.workerID} for route to {dst_host= }")
                     self._overseerController.handleRouteRequest(dst_host, self.workerID)
 
                 case CMD.DPID_RESPONSE:
                     dpid = msg['dpid']
-                    logger.debug(f"Got switch to worker assignment msg for {dpid= }")
+                    logger.debug(f"Got switch to worker assignment msg from {self.workerID} for {dpid= }")
                     self._overseerController.handleDpidResponse(dpid, self.workerID)
 
                 case CMD.LOAD_UPDATE:
                     load = msg['load']
-                    logger.debug(f"Got load update to {load= }")
+                    logger.debug(f"Got load update from worker{self.workerID}: {load= }")
                     self._overseerController.handleLoadUpdate(float(load), self.workerID)
 
                 case CMD.DPID_TO_ROLE:
                     switches = msg['switches']
-                    logger.debug(f"Got role status for {switches= }")
+                    logger.debug(f"Got role status from worker{self.workerID} for {switches= }")
                     self._overseerController.handleDpidToRole(switches, self.workerID)
 
                 case _:
@@ -257,10 +257,10 @@ class SCWorker:
 
     def _receivingLoop(self) -> None:
         """Receiving loop for a client."""
-        with Timeout(10, False):
+        with Timeout(TIMEOUT, False):
             while self.isActive:
                 try:
-                    _buffer = self.webSocket.recv(128)
+                    _buffer = self.webSocket.recv(1024)
 
                     if len(_buffer) == 0:
                         sleep(1)
@@ -286,6 +286,7 @@ class SCWorker:
         SCWSEventBase.joinAll([thread1, thread2])
 
 
+    @property
     def numControlledSwitches(self) -> int:
         """Calculate the number of switches that have this controlled as master.
 
@@ -294,7 +295,7 @@ class SCWorker:
         """
         result = 0
         for k in self.dpid2role:
-            result += 1 if self.dpid2role[k] == ROLE.MASTER else 0
+            result += 1 if self.dpid2role[k] in [ROLE.MASTER, ROLE.EQUAL] else 0
         return result
 
     def close(self) -> None:
@@ -321,6 +322,7 @@ class SuperController:
         self.server: SCServer = SCServer((bind_address, bind_port), self._connectionFactory)
         self.xdom_links: list[dict[str, dict[str, str | int]]] = []
         self.hosts: dict[str, int] = {}
+        self.load_avg: float = STARTING_LOAD_THRESHOLD
 
 
     # . BEGIN SuperController utils {
@@ -386,7 +388,7 @@ class SuperController:
 
         for wid, ctrl in controllers:
 
-            if ctrl.loadScore < LOAD_THRESHOLD and wid is not busy_controller_id:
+            if ctrl.loadScore < self.load_avg and wid is not busy_controller_id:
                 free_controller = wid
                 break
 
@@ -401,14 +403,18 @@ class SuperController:
             free_worker_id: id of a free controller/worker
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
-            if role == ROLE.MASTER.value and dpid in self.workers[free_worker_id].dpid2role.keys():
-                msg = json.dumps({
-                    'cmd': f"{CMD.ROLE_CHANGE}",
-                    'role': ROLE.SLAVE.value,
-                    'dpid': dpid,
-                })
-                self.workers[busy_worker_id].sendMsg(msg)
-                self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
+            if role in [ROLE.MASTER.value, ROLE.EQUAL.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
+                logger.debug(f"Change role on worker{busy_worker_id} to SLAVE for {dpid= }")
+                # NOTE: we cannot explicitly tell the switch that now controller is SLAVE
+                # NOTE: it becomes the SLAVE once another becomes MASTER
+                # msg = json.dumps({
+                #     'cmd': f"{CMD.ROLE_CHANGE}",
+                #     'role': ROLE.SLAVE.value,
+                #     'dpid': dpid,
+                # })
+                # self.workers[busy_worker_id].sendMsg(msg)
+                # self.workers[busy_worker_id].dpid2role[dpid] = ROLE.SLAVE
+                logger.debug(f"Change role on worker{free_worker_id} to MASTER for {dpid= }")
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
                     'role': ROLE.MASTER.value,
@@ -416,14 +422,17 @@ class SuperController:
                 })
                 self.workers[free_worker_id].sendMsg(msg)
                 self.workers[free_worker_id].dpid2role[dpid] = ROLE.MASTER
+                break # break after first change
+
 
     def _sendingLoop(self) -> None:
         """Sending loop for the server balancing task."""
         while True:
+            self._calculateAverageLoad()
             for wid, worker in self.workers.items():
                 free_controller = None
 
-                if worker.loadScore > LOAD_THRESHOLD:
+                if worker.loadScore > self.load_avg:
                     free_controller = self._findFreeControllers(wid)
 
                 if free_controller is not None:
@@ -484,6 +493,17 @@ class SuperController:
                 links.append((src, dst))
 
         return links
+
+
+    def _calculateAverageLoad(self) -> None:
+        loads = []
+        for _, worker in self.workers.items():
+            loads.append(worker.loadScore)
+
+        if len(loads) != 0:
+            self.load_avg = sum(loads) / len(loads)
+        else:
+            self.load_avg = STARTING_LOAD_THRESHOLD
     # . END SuperController utils }
 
 

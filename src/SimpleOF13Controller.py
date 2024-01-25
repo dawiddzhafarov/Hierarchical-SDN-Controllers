@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from sys import stdout
+
 import psutil
 import socket
 import struct
@@ -38,17 +40,11 @@ from aux_classes import LBEventRoleChange
 from super_controller import ROLE, CMD
 
 LOG = logging.getLogger("load_balance_lib")
-
+logging.basicConfig(stream=stdout, level=logging.DEBUG)
 ALPHA = 0.5
 BETA = 1 - ALPHA
 
-def get_cpu_utilization(interval: int = 1) -> int:
-    return int(psutil.cpu_percent(interval=interval))
 
-
-def get_ram_utilization() -> int:
-    ram = psutil.virtual_memory()
-    return int(ram.percent)
 
 
 class SimpleSwitch13(app_manager.RyuApp):
@@ -356,11 +352,14 @@ class SimpleSwitch13(app_manager.RyuApp):
         Request controller role for a given DPID
         """
         ofp_parser = datapath.ofproto_parser
+        gen_id = random.randint(0, 10000)
         req = ofp_parser.OFPCtrlMsg(
             datapath, datapath.ofproto.OFPT_ROLE_REQUEST,
-            datapath.ofproto.OFPCR_ROLE_REQUEST_MORE)
-        datapath.send_msg(req)
+            datapath.ofproto.OFPCR_ROLE_REQUEST_MORE,
+            gen_id
+        )
         LOG.debug(f'sent role query for switch: {datapath} with body: {req}')
+        datapath.send_msg(req)
 
     @set_ev_cls(ofp_event.EventOFPRoleReply, MAIN_DISPATCHER)
     def _role_reply_handler(self, ev):

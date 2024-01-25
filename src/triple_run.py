@@ -6,18 +6,46 @@ Runner script for triple controllers.
 
 import sys
 import os
-from itertools import permutations
+from itertools import permutations, groupby
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from mininet.net import Mininet
-from mininet.node import OVSKernelSwitch, RemoteController
+from mininet.node import RemoteController
 from mininet.topo import Topo
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 
 from topos.abilene_topo import AbileneTopo
 from topos.abilene_mod_topo import AbileneModTopo
+
+
+def start_net(net: Mininet):
+    "Start controller and switches."
+    if not net.built:
+        net.build()
+    info( '*** Starting controller\n' )
+    for controller in net.controllers:
+        info( controller.name + ' ')
+        controller.start()
+    info( '\n' )
+    controller_perms = list(permutations(net.controllers))
+    permlen = len(controller_perms)
+    info( '*** Starting %s switches\n' % len( net.switches ) )
+    for idx, switch in enumerate(net.switches):
+        info( switch.name + ' ')
+        switch.start( controller_perms[idx % permlen] )
+    started = {}
+    for swclass, switches in groupby(
+            sorted( net.switches,
+                    key=lambda s: str( type( s ) ) ), type ):
+        switches = tuple( switches )
+        if hasattr( swclass, 'batchStartup' ):
+            success = swclass.batchStartup( switches )
+            started.update( { s: s for s in success } )
+    info( '\n' )
+    if net.waitConn:
+        net.waitConnected()
 
 
 def simple_run(topo: Topo):
@@ -32,19 +60,20 @@ def simple_run(topo: Topo):
     c1 = net.addController('c1', controller=RemoteController, ip="127.0.0.1", port=6653)
     c2 = net.addController('c2', controller=RemoteController, ip="127.0.0.1", port=6654)
     c3 = net.addController('c3', controller=RemoteController, ip="127.0.0.1", port=6655)
-    controllers = [c1, c2, c3]
-    controller_perms = list(permutations(controllers))
 
-    net.build()
+    # net.build()
     info('*** Starting network\n')
-    for c in controllers:
-        c.start()
+    # for c in controllers:
+    #     c.start()
+    #
+    # for idx, sw in enumerate(net.switches):
+    #     print(type(sw))
+    #     sw.start(list(controller_perms[idx % 6]))
 
-    for idx, sw in enumerate(net.switches):
-        sw.start(list(controller_perms[idx % 6]))
-
-    # net.start()
+    start_net(net)
     # net.staticArp()
+    # for name, node in net.nameToNode.items():
+    #     print(f"{name} :: {node.connected()}")
 
     info('*** Running CLI\n')
     CLI(net)

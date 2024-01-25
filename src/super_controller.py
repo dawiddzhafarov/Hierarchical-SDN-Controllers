@@ -23,7 +23,7 @@ logger = getLogger("SDN_SuperController")
 basicConfig(stream=stdout, level=DEBUG)
 
 WORKER_LIMIT = 1024
-LOAD_THRESHOLD = 0.7
+STARTING_LOAD_THRESHOLD = 10.0
 TIME_BALANCING = 1
 TIMEOUT = 600
 
@@ -322,6 +322,7 @@ class SuperController:
         self.server: SCServer = SCServer((bind_address, bind_port), self._connectionFactory)
         self.xdom_links: list[dict[str, dict[str, str | int]]] = []
         self.hosts: dict[str, int] = {}
+        self.load_avg: float = STARTING_LOAD_THRESHOLD
 
 
     # . BEGIN SuperController utils {
@@ -387,7 +388,7 @@ class SuperController:
 
         for wid, ctrl in controllers:
 
-            if ctrl.loadScore < LOAD_THRESHOLD and wid is not busy_controller_id:
+            if ctrl.loadScore < self.load_avg and wid is not busy_controller_id:
                 free_controller = wid
                 break
 
@@ -402,7 +403,7 @@ class SuperController:
             free_worker_id: id of a free controller/worker
         """
         for dpid, role in self.workers[busy_worker_id].dpid2role.items():
-            if role [ROLE.MASTER.value, ROLE.SLAVE.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
+            if role in [ROLE.MASTER.value, ROLE.EQUAL.value] and dpid in self.workers[free_worker_id].dpid2role.keys():
                 logger.debug(f"Change role on worker{busy_worker_id} to SLAVE")
                 msg = json.dumps({
                     'cmd': f"{CMD.ROLE_CHANGE}",
@@ -425,10 +426,11 @@ class SuperController:
     def _sendingLoop(self) -> None:
         """Sending loop for the server balancing task."""
         while True:
+            self._calculateAverageLoad()
             for wid, worker in self.workers.items():
                 free_controller = None
 
-                if worker.loadScore > LOAD_THRESHOLD:
+                if worker.loadScore > self.load_avg:
                     free_controller = self._findFreeControllers(wid)
 
                 if free_controller is not None:
@@ -489,6 +491,14 @@ class SuperController:
                 links.append((src, dst))
 
         return links
+
+
+    def _calculateAverageLoad(self) -> None:
+        loads = []
+        for _, worker in self.workers.items():
+            loads.append(worker.loadScore)
+
+        self.load_avg = sum(loads) / len(loads)
     # . END SuperController utils }
 
 
